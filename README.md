@@ -32,6 +32,15 @@ GEMINI_API_KEY=your_gemini_api_key
 Keep both keys server-side. The browser receives only the short-lived Reactor
 JWT and the image returned by the Nano Banana route.
 
+## Python server-owned Orbis tool
+
+The existing Next.js demo connects the browser directly to Reactor. The
+separate `orbis_service/` implementation is for the agent-driven architecture:
+the Python Orbis function tool owns the Reactor connection, starts and steers
+the model, and relays received frames to the frontend over a WebSocket. See
+[`orbis_service/README.md`](orbis_service/README.md) for setup and endpoint
+tests.
+
 ## Nano Banana kickoff example
 
 Connect to Orbis, expand **Livestreaming example**, and click

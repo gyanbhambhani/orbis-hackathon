@@ -11,10 +11,10 @@ resulting Reactor-hosted Visko Orbis video to the existing frontend.
 ```text
 Frontend
   -> Main Agent (OpenAI Agents SDK)
-       -> Personality Agent (OpenAI Agents SDK + JSON-file tools)
-       -> Live Model Agent (server-side Orbis integration service)
+       -> Personality Agent subagent (OpenAI Agents SDK + JSON-file tools)
+       -> Orbis Reactor tool (deterministic Python function)
             -> Reactor / Visko Orbis
-                 -> Existing WebRTC player
+                 -> Python frame relay -> frontend player
 ```
 
 ### Main Agent
@@ -26,8 +26,8 @@ Responsibilities:
 
 - Validate the user prompt and requested action (`start` or `steer`).
 - Ask the Personality Agent to read, create, or update a personality.
-- Send the user prompt and resolved personality to the Live Model Agent.
-- Return an Orbis stream specification to the frontend.
+- Call the Orbis Reactor tool with the user prompt and resolved personality.
+- Return the active stream ID and relay URL to the frontend.
 - Record an MVP run log: user input, personality ID, final Orbis prompt,
   action, and timestamp.
 
@@ -64,45 +64,94 @@ type Personality = {
 };
 ```
 
-### Live Model Agent
+### Orbis Reactor Tool
 
-The Live Model Agent is a server-side service responsible for turning the
-user's intent and the selected personality into an Orbis-compatible prompt.
-It does not require an LLM in the first MVP iteration.
+## Reactor / Orbis Tool Plan
 
-Input:
+This team owns the Reactor / Orbis tool. The Main Agent calls it with a
+completed, personality-conditioned video prompt. The tool owns a persistent
+server-side Reactor connection, calls the Orbis API, and relays the received
+frames to the frontend. It is a function tool, not an OpenAI agent.
 
-```ts
-{
-  userPrompt: string;
-  personality: Personality;
-  action: "start" | "steer";
-}
+### Boundary
+
+The function accepts a video prompt and starts a server-owned stream:
+
+```python
+async def start_orbis_stream(prompt: str) -> ToolResult:
+    # connect using REACTOR_API_KEY / ORBIS_API_KEY
+    # send set_prompt, then start
+    # return a stable stream_id
+    ...
 ```
 
-Output:
+For follow-up prompts, the Main Agent calls the same tool with `stream_id` and
+the new prompt. The tool calls `set_prompt` on the existing Reactor session;
+it does not reconnect or call `start` again. Orbis applies the new prompt at
+the next chunk boundary.
 
-```ts
-{
-  orbisPrompt: string;
-  action: "start" | "steer";
-}
-```
+### Tool implementation
 
-The initial implementation should use a deterministic, inspectable template:
+Implement the following Python function tools and register them on the Main
+Agent:
+
+- `start_orbis_stream(prompt)` — connects, sets the initial prompt, and
+  starts generation.
+- `steer_orbis_stream(stream_id, prompt)` — sends `set_prompt` to the active
+  session.
+- `stop_orbis_stream(stream_id)` — closes the session and releases resources.
+
+The tool receives the stream, resolution, and command events from Reactor; it
+must retain the `Reactor` object in a process-local stream manager. The React
+frontend connects to a service WebSocket to receive relayed frames. The first
+MVP relay can send JPEG frames; replace it with a WebRTC relay before
+production. [Reactor Orbis API reference](https://www.reactor.inc/models/visko-orbis-stable/api)
+
+### Execution flow
 
 ```text
-Create a continuous live video of: {userPrompt}.
-Personality: {description}.
-Visual style: {visualStyle}.
-Motion: {motionStyle}.
-Tone: {tone}.
-Avoid: {negativeConstraints}.
-No captions, UI, logos, or watermarks unless explicitly requested.
+Main Agent
+  -> PersonalityAgent.run(user request)
+  -> receives validated Personality
+  -> start_orbis_stream(prompt) [Python tool]
+  -> Reactor: set_prompt, start
+  -> service WebSocket relays received frames to frontend
 ```
 
-It can later become a third OpenAI Agents SDK agent without changing its input
-or output contract.
+For a follow-up prompt:
+
+```text
+Main Agent -> steer_orbis_stream(stream_id, prompt)
+            -> Reactor set_prompt
+            -> same video relay remains connected
+```
+
+### Files owned by this tool
+
+```text
+orbis_service/app/main.py               # FastAPI start, steer, stop, and frame endpoints
+orbis_service/app/orbis_tool.py         # OpenAI Agents SDK function tools
+orbis_service/app/stream_manager.py     # persistent Reactor sessions and frame relay
+orbis_service/app/models.py             # Pydantic request and response schemas
+```
+
+### Guardrails and errors
+
+- Validate all user-derived prompt text for a non-empty, bounded length.
+- Never expose the Reactor API key to the browser.
+- Keep a bounded frame queue so slow clients do not add latency.
+- Surface Reactor connection and command failures as structured API errors.
+- Stop and remove a stream when the user ends it or the service shuts down.
+- Do not log credentials.
+
+### Build order
+
+1. Implement the server-owned Reactor stream manager and FastAPI endpoints.
+2. Register start and steer operations as OpenAI Agents SDK function tools.
+3. Test input validation, missing-key errors, stream start, steering, and
+   shutdown.
+4. Connect the frontend to the frame WebSocket.
+5. Replace JPEG-frame relay with WebRTC before production.
 
 ## Persistence
 
@@ -209,9 +258,9 @@ components/personality-editor.tsx
 2. Implement the personality API routes.
 3. Add the OpenAI Agents SDK and implement the Personality Agent with only
    personality store tools.
-4. Implement the Main Agent to orchestrate user prompt, Personality Agent,
-   and Live Model Agent.
-5. Implement the deterministic Live Model Agent prompt template.
+4. Implement the Main Agent to orchestrate the Personality Agent and Orbis
+   Reactor tool.
+5. Implement the Orbis Reactor tool's command-plan rules and schema.
 6. Add `POST /api/agent/run` with input/output validation and run logging.
 7. Wire the resulting prompt into `useOrbisSession` for start and live
    steering.
@@ -224,7 +273,8 @@ components/personality-editor.tsx
 - A user can select an existing personality or create/update one.
 - The Main Agent retrieves the relevant structured personality through the
   Personality Agent.
-- The Live Model Agent generates a personality-conditioned Orbis prompt.
+- The Orbis Reactor tool generates a personality-conditioned Orbis command
+  plan and prompt.
 - A new stream starts successfully in the existing player.
 - A user can steer a running stream without restarting it.
 - No OpenAI or Reactor long-lived API secret is exposed to the browser.

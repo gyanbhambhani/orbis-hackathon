@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: orbis-service
+Version: 0.1.0
+Summary: Python Orbis Reactor tool and streaming relay for the Orbis MVP
+Requires-Python: >=3.11
+Requires-Dist: fastapi<1,>=0.115
+Requires-Dist: numpy<3,>=2
+Requires-Dist: openai-agents>=0.0.20
+Requires-Dist: pillow<12,>=10
+Requires-Dist: pydantic<3,>=2.7
+Requires-Dist: reactor-sdk
+Requires-Dist: uvicorn[standard]<1,>=0.30

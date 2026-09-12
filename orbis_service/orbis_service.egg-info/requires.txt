@@ -1,0 +1,7 @@
+fastapi<1,>=0.115
+numpy<3,>=2
+openai-agents>=0.0.20
+pillow<12,>=10
+pydantic<3,>=2.7
+reactor-sdk
+uvicorn[standard]<1,>=0.30
