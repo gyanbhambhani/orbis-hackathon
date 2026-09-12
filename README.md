@@ -8,29 +8,64 @@ resume, and a foldable Nano Banana-to-Orbis livestreaming example.
 ## Requirements
 
 - Node.js 20.9 or newer
-- A Reactor API key with access to Visko Orbis Stable
-- A Google Gemini API key with access to Nano Banana
+- A Reactor API key with access to Visko Orbis Stable (for live video)
+- A Google Gemini API key (for image edit and Orbis prompt grounding)
+- An OpenAI API key (for the agent scaffold: room dialogue, compile, idle)
 
 ## Run locally
 
 ```bash
 cp .env.example .env.local
-# Add your Reactor API key to .env.local.
+# Fill in the keys below — see "Environment variables".
 npm install
 npm run dev
 ```
 
 Open <http://localhost:3000>.
 
-Set both keys in `.env.local`:
+## Environment variables
+
+Create `.env.local` in the project root (it is gitignored). Copy from
+`.env.example` and fill in your values:
 
 ```dotenv
+# Reactor / Orbis — live world streaming (POST /api/token, Room video)
 REACTOR_API_KEY=your_reactor_api_key
+
+# Google Gemini — image edit + Orbis prompt grounding
+# Routes: /api/nano-banana, /api/orbis-prompt
 GEMINI_API_KEY=your_gemini_api_key
+
+# OpenAI — agent scaffold (dialogue, compiler, idle director)
+# Routes: /api/turn, /api/agent/health
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
-Keep both keys server-side. The browser receives only the short-lived Reactor
-JWT and the image returned by the Nano Banana route.
+| Variable | Required for | Where to get it |
+|---|---|---|
+| `REACTOR_API_KEY` | Orbis live video, Room streaming | Reactor dashboard / hackathon credentials |
+| `GEMINI_API_KEY` | Nano Banana image edit, Orbis prompt grounding | [Google AI Studio](https://aistudio.google.com/apikey) |
+| `OPENAI_API_KEY` | Agent routes (`/api/turn`, sub-agents) | [OpenAI API keys](https://platform.openai.com/api-keys) |
+| `OPENAI_MODEL` | Which model agents use (optional) | Defaults to `gpt-4.1-mini` if unset |
+
+**Minimum by feature:**
+
+- **Agent work only** — `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`)
+- **Room with live video** — `REACTOR_API_KEY` + `OPENAI_API_KEY`
+- **Full stack** (video + Gemini tools + agents) — all four variables
+
+Keep all keys server-side. The browser receives only a short-lived Reactor JWT
+and API responses — never the raw keys.
+
+**Verify agent setup** (after `npm run dev`):
+
+```bash
+curl http://localhost:3000/api/agent/health
+```
+
+You should see `"ok": true` when `OPENAI_API_KEY` is set. See
+[`lib/agents/README.md`](lib/agents/README.md) for agent development details.
 
 ## Nano Banana kickoff example
 
@@ -97,6 +132,8 @@ before it is sent to Orbis.
 - `lib/orbis-prompt.ts` contains the plain-text Gemini grounding instruction.
 - `lib/nano-banana.ts` contains the model and kickoff prompt.
 - `.env.example` documents the required environment variables.
+- `lib/agents/` contains the OpenAI Agents SDK scaffold (orchestrator + sub-agents).
+- `app/api/turn/route.ts` and `app/api/agent/health/route.ts` are the agent API entry points.
 
 For the complete command parameters, message schemas, tracks, and current model
 behavior, use the public Reactor documentation:
