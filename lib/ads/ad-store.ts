@@ -10,6 +10,7 @@ export type AdStoreState = {
   promptId: string | null;
   promptVersion: number | null;
   approvedPrompt: string | null;
+  relayUrl: string | null;
   resumeTimestamp: number | null;
   videoId: string | null;
   visualElapsedMs: number;
@@ -24,6 +25,7 @@ export type AdStoreState = {
   setVisualElapsedMs: (ms: number) => void;
   setError: (error: string) => void;
   setResumeFrameNote: (note: string) => void;
+  setRelayUrl: (url: string | null) => void;
   beginArming: (input: {
     videoId: string;
     resumeTimestamp: number;
@@ -50,6 +52,7 @@ export const useAdStore = create<AdStoreState>((set) => ({
   promptId: null,
   promptVersion: null,
   approvedPrompt: null,
+  relayUrl: null,
   resumeTimestamp: null,
   videoId: null,
   visualElapsedMs: 0,
@@ -66,6 +69,7 @@ export const useAdStore = create<AdStoreState>((set) => ({
   setVisualElapsedMs: (visualElapsedMs) => set({ visualElapsedMs }),
   setError: (error) => set({ error }),
   setResumeFrameNote: (resumeFrameNote) => set({ resumeFrameNote }),
+  setRelayUrl: (relayUrl) => set({ relayUrl }),
 
   beginArming: ({ videoId, resumeTimestamp }) =>
     set({
@@ -80,6 +84,7 @@ export const useAdStore = create<AdStoreState>((set) => ({
       promptId: null,
       promptVersion: null,
       approvedPrompt: null,
+      relayUrl: null,
     }),
 
   setSessionMeta: ({
@@ -130,6 +135,7 @@ export const useAdStore = create<AdStoreState>((set) => ({
       overlayVisible: false,
       adSessionId: null,
       approvedPrompt: null,
+      relayUrl: null,
       visualElapsedMs: 0,
     }),
 
